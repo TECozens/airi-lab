@@ -104,7 +104,7 @@ app.whenReady().then(async () => {
   })
 
   const tray = injeca.provide('app:tray', {
-    dependsOn: { mainWindow, settingsWindow, captionWindow, widgetsWindow: widgetsManager, beatSyncBgWindow: beatSync, aboutWindow },
+    dependsOn: { mainWindow, settingsWindow, chatWindow, captionWindow, widgetsWindow: widgetsManager, beatSyncBgWindow: beatSync, aboutWindow },
     build: async ({ dependsOn }) => setupTray(dependsOn),
   })
 

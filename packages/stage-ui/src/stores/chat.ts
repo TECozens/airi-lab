@@ -10,6 +10,7 @@ import { defineStore, storeToRefs } from 'pinia'
 import { computed, ref, toRaw, watch } from 'vue'
 
 import { useLlmmarkerParser } from '../composables/llmmarkerParser'
+import { useThinkTagExtractor } from '../composables/useThinkTagExtractor'
 import { useLLM } from '../stores/llm'
 import { createQueue } from '../utils/queue'
 import { TTS_FLUSH_INSTRUCTION } from '../utils/tts'
@@ -358,6 +359,8 @@ export const useChatStore = defineStore('chat', () => {
       const sessionMessagesForSend = getSessionMessagesById(sessionId)
       sessionMessagesForSend.push({ role: 'user', content: finalContent })
 
+      const thinkExtractor = useThinkTagExtractor()
+
       const parser = useLlmmarkerParser({
         onLiteral: async (literal) => {
           if (shouldAbort())
@@ -470,10 +473,36 @@ export const useChatStore = defineStore('chat', () => {
               break
             case 'text-delta':
               fullText += event.text
-              await parser.consume(event.text)
+              // DEBUG: Log raw text to see actual format
+              // eslint-disable-next-line no-console
+              console.debug('[ThinkExtractor] Raw text delta:', JSON.stringify(event.text))
+              // Extract think tags before passing to parser
+              const filteredText = thinkExtractor.extract(event.text)
+              // eslint-disable-next-line no-console
+              console.debug('[ThinkExtractor] Filtered text:', JSON.stringify(filteredText))
+              // eslint-disable-next-line no-console
+              console.debug('[ThinkExtractor] Current extracted think:', JSON.stringify(thinkExtractor.getExtracted()))
+              if (filteredText) {
+                await parser.consume(filteredText)
+              }
               break
             case 'finish':
-            // Do nothing, resolve
+              // Flush any remaining buffer (text after closing tags)
+              const remainingText = thinkExtractor.flush()
+              if (remainingText) {
+                await parser.consume(remainingText)
+              }
+
+              // Store extracted think content
+              const extractedThink = thinkExtractor.getExtracted().trim()
+              // eslint-disable-next-line no-console
+              console.debug('[ThinkExtractor] Extracted think content:', JSON.stringify(extractedThink))
+              // eslint-disable-next-line no-console
+              console.debug('[ThinkExtractor] Full text:', JSON.stringify(fullText))
+              if (extractedThink) {
+                streamingMessage.value.think = extractedThink
+              }
+              thinkExtractor.reset()
               break
             case 'error':
               throw event.error ?? new Error('Stream error')
@@ -489,7 +518,7 @@ export const useChatStore = defineStore('chat', () => {
       }
 
       // Reset the streaming message for the next turn
-      streamingMessage.value = { role: 'assistant', content: '', slices: [], tool_results: [] }
+      streamingMessage.value = { role: 'assistant', content: '', slices: [], tool_results: [], think: undefined }
 
       // Instruct the TTS pipeline to flush by calling hooks directly
       const flushSignal = `${TTS_FLUSH_INSTRUCTION}${TTS_FLUSH_INSTRUCTION}`

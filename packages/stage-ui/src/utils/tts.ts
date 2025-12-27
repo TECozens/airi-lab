@@ -252,10 +252,18 @@ export async function chunkEmitter(
       if (chunk.reason === 'special') {
         const specialToken = pendingSpecials.shift()
         // console.debug("special yield:", specialToken)
-        await handler({ chunk: sanitizeChunk(chunk.text), special: specialToken ?? null })
+        const sanitized = sanitizeChunk(chunk.text)
+        // Only call handler if chunk has content or has special token
+        if (sanitized || specialToken) {
+          await handler({ chunk: sanitized, special: specialToken ?? null })
+        }
       }
       else {
-        await handler({ chunk: sanitizeChunk(chunk.text), special: null } as TTSChunkItem)
+        const sanitized = sanitizeChunk(chunk.text)
+        // Only call handler if chunk has content
+        if (sanitized) {
+          await handler({ chunk: sanitized, special: null } as TTSChunkItem)
+        }
       }
     }
   }

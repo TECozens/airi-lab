@@ -25,6 +25,7 @@ export interface ChatAssistantMessage extends AssistantMessage {
     id: string
     result?: string | CommonContentPart[]
   }[]
+  think?: string // Extracted think/reasoning content from Ollama responses
 }
 
 export type ChatMessage = ChatAssistantMessage | SystemMessage | ToolMessage | UserMessage

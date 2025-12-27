@@ -21,6 +21,7 @@ import { toggleWindowShow } from '../windows/shared/window'
 export function setupTray(params: {
   mainWindow: BrowserWindow
   settingsWindow: () => Promise<BrowserWindow>
+  chatWindow: () => Promise<BrowserWindow>
   captionWindow: ReturnType<typeof setupCaptionWindowManager>
   widgetsWindow: WidgetsWindowManager
   beatSyncBgWindow: Awaited<ReturnType<typeof setupBeatSync>>
@@ -39,6 +40,7 @@ export function setupTray(params: {
       { label: 'Settings...', click: () => params.settingsWindow().then(window => toggleWindowShow(window)) },
       { label: 'About...', click: () => params.aboutWindow().then(window => toggleWindowShow(window)) },
       { type: 'separator' },
+      { label: 'Open Chat...', click: () => params.chatWindow().then(window => toggleWindowShow(window)) },
       { label: 'Open Inlay...', click: () => setupInlayWindow() },
       { label: 'Open Widgets...', click: () => params.widgetsWindow.getWindow().then(window => toggleWindowShow(window)) },
       { label: 'Open Caption...', click: () => params.captionWindow.getWindow().then(window => toggleWindowShow(window)) },

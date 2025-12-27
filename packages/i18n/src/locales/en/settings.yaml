@@ -37,6 +37,12 @@ language:
   description: >
     Change the language of the AIRI interface. This will not affect the language
     of the character's responses.
+chat:
+  toolCalls:
+    title: Enable Tool Calls
+    description: >
+      Allow the AI to use tools and function calling (MCP, debug tools, etc.).
+      Disabled by default to keep conversations focused.
 live2d:
   change-model:
     from-file: Load from File

@@ -8,6 +8,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 import { debug, mcp } from '../tools'
+import { useSettings } from './settings'
 
 export type StreamEvent
   = | { type: 'text-delta', text: string }
@@ -43,6 +44,7 @@ function streamOptionsToolsCompatibilityOk(model: string, chatProvider: ChatProv
 
 async function streamFrom(model: string, chatProvider: ChatProvider, messages: Message[], options?: StreamOptions) {
   const headers = options?.headers
+  const settingsStore = useSettings()
 
   const sanitized = sanitizeMessages(messages as unknown[])
   const resolveTools = async () => {
@@ -56,13 +58,17 @@ async function streamFrom(model: string, chatProvider: ChatProvider, messages: M
     try {
       const supportedTools = streamOptionsToolsCompatibilityOk(model, chatProvider, messages, options)
 
+      // Check if tool calls are enabled in settings
+      const toolCallsEnabled = settingsStore.chatToolCallsEnabled
+
       await streamText({
         ...chatProvider.chat(model),
         maxSteps: 10,
         messages: sanitized,
         headers,
         // TODO: we need Automatic tools discovery
-        tools: supportedTools
+        // Only include tools if tool calls are enabled
+        tools: supportedTools && toolCallsEnabled
           ? [
               ...await mcp(),
               ...await debug(),

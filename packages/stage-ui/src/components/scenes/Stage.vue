@@ -207,17 +207,62 @@ async function handleSpeechGeneration(ctx: { data: TTSChunkItem }) {
       ? speechStore.generateSSML(ctx.data.chunk, activeSpeechVoice.value, { ...providerConfig, pitch: pitch.value })
       : ctx.data.chunk
 
+    // Skip if input is empty or only whitespace
+    if (!input || !input.trim()) {
+      return
+    }
+
     const res = await generateSpeech({
       ...provider.speech(activeSpeechModel.value, providerConfig),
       input,
       voice: activeSpeechVoice.value.id,
     })
 
-    const audioBuffer = await audioContext.decodeAudioData(res)
-    playbackQueue.value.enqueue({ audioBuffer, text: ctx.data.chunk, special: ctx.data.special })
+    // Validate response before decoding
+    if (!res) {
+      console.warn('Empty audio response from TTS provider for input:', input.substring(0, 50))
+      return
+    }
+
+    // Check if response is an ArrayBuffer
+    if (!(res instanceof ArrayBuffer)) {
+      console.error('Invalid audio response type:', typeof res, res)
+      return
+    }
+
+    // Check if response has content
+    if (res.byteLength === 0) {
+      console.warn('Empty audio buffer from TTS provider')
+      return
+    }
+
+    try {
+      const audioBuffer = await audioContext.decodeAudioData(res)
+      playbackQueue.value.enqueue({ audioBuffer, text: ctx.data.chunk, special: ctx.data.special })
+    }
+    catch (decodeError) {
+      console.error('Failed to decode audio data:', decodeError)
+      console.error('Audio buffer info:', {
+        provider: activeSpeechProvider.value,
+        byteLength: res.byteLength,
+        inputLength: input.length,
+        inputPreview: input.substring(0, 100),
+        // Log first few bytes to check if it's valid audio data
+        firstBytes: Array.from(new Uint8Array(res.slice(0, Math.min(20, res.byteLength)))),
+      })
+      // Don't rethrow - just log and skip this chunk
+    }
   }
   catch (error) {
     console.error('Speech generation failed:', error)
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+      })
+    }
   }
 }
 
@@ -273,6 +318,10 @@ function setupAnalyser() {
   }
 }
 
+// Buffer for TTS text - accumulate during streaming, send when stream ends
+const ttsBuffer = ref<string>('')
+const ttsSpecialTokensBuffer = ref<string[]>([])
+
 chatHookCleanups.push(onBeforeMessageComposed(async () => {
   clearAll()
   setupAnalyser()
@@ -281,26 +330,51 @@ chatHookCleanups.push(onBeforeMessageComposed(async () => {
   assistantCaption.value = ''
   postCaption({ type: 'caption-assistant', text: '' })
   postPresent({ type: 'assistant-reset' })
+  // Clear TTS buffer for new message
+  ttsBuffer.value = ''
+  ttsSpecialTokensBuffer.value = []
 }))
 
 chatHookCleanups.push(onBeforeSend(async () => {
   currentMotion.value = { group: EmotionThinkMotionName }
+  // Clear TTS buffer when starting new send
+  ttsBuffer.value = ''
+  ttsSpecialTokensBuffer.value = []
 }))
 
 chatHookCleanups.push(onTokenLiteral(async (literal) => {
-  // Only push to segmentation; visual presentation happens on playback start
-  textSegmentationQueue.value.enqueue({ type: 'literal', value: literal } as TextSegmentationItem)
+  // Buffer text during streaming instead of sending immediately
+  ttsBuffer.value += literal
 }))
 
 chatHookCleanups.push(onTokenSpecial(async (special) => {
   // delaysQueue.enqueue(special)
   // emotionMessageContentQueue.enqueue(special)
-  // Also push special token to the queue for emotion animation/delay and TTS playback synchronisation
-  textSegmentationQueue.value.enqueue({ type: 'special', value: special } as TextSegmentationItem)
+  // Buffer special tokens during streaming
+  ttsSpecialTokensBuffer.value.push(special)
 }))
 
 chatHookCleanups.push(onStreamEnd(async () => {
   delaysQueue.enqueue(llmInferenceEndToken)
+  
+  // Now that stream has ended, send all buffered text to TTS
+  // Only send if there's actual content (not just whitespace)
+  const trimmedBuffer = ttsBuffer.value.trim()
+  if (trimmedBuffer || ttsSpecialTokensBuffer.value.length > 0) {
+    // Send buffered text to segmentation queue (only if not empty)
+    if (trimmedBuffer) {
+      textSegmentationQueue.value.enqueue({ type: 'literal', value: ttsBuffer.value } as TextSegmentationItem)
+    }
+    
+    // Send buffered special tokens
+    for (const special of ttsSpecialTokensBuffer.value) {
+      textSegmentationQueue.value.enqueue({ type: 'special', value: special } as TextSegmentationItem)
+    }
+    
+    // Clear buffers
+    ttsBuffer.value = ''
+    ttsSpecialTokensBuffer.value = []
+  }
 }))
 
 chatHookCleanups.push(onAssistantResponseEnd(async (_message) => {

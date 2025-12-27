@@ -112,6 +112,8 @@ export const useSettings = defineStore('settings', () => {
 
   const [allowVisibleOnAllWorkspaces, resetAllowVisibleOnAllWorkspaces] = createResettableLocalStorage('settings/allow-visible-on-all-workspaces', true)
 
+  const [chatToolCallsEnabled, resetChatToolCallsEnabled] = createResettableLocalStorage('settings/chat/tool-calls-enabled', false)
+
   function getLanguage() {
     let language = localStorage.getItem('settings/language')
 
@@ -183,6 +185,8 @@ export const useSettings = defineStore('settings', () => {
 
     resetAllowVisibleOnAllWorkspaces()
 
+    resetChatToolCallsEnabled()
+
     await updateStageModel()
   }
 
@@ -207,6 +211,8 @@ export const useSettings = defineStore('settings', () => {
     themeColorsHueDynamic,
 
     allowVisibleOnAllWorkspaces,
+
+    chatToolCallsEnabled,
 
     setThemeColorsHue,
     applyPrimaryColorFrom,

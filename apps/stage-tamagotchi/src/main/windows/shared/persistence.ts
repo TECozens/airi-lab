@@ -7,7 +7,16 @@ import { app } from 'electron'
 import { throttle } from 'es-toolkit'
 
 function parseOrFallback<T>(config: string, fallback: T | undefined): T | undefined {
-  return safeDestr<T>(config) || fallback
+  try {
+    // Try to parse the config, but handle malformed JSON gracefully
+    const parsed = safeDestr<T>(config)
+    return parsed || fallback
+  }
+  catch (error) {
+    console.error('Failed to parse config file, using fallback:', error)
+    // If parsing fails, return fallback and the file will be overwritten on next save
+    return fallback
+  }
 }
 
 const persistenceMap = new Map<string, any>()

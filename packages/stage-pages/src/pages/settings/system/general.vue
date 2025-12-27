@@ -43,6 +43,18 @@ const languages = computed(() => {
       :options="languages"
     />
 
+    <!-- Tool Calls Setting -->
+    <FieldCheckbox
+      v-model="settings.chatToolCallsEnabled"
+      v-motion
+      :initial="{ opacity: 0, y: 10 }"
+      :enter="{ opacity: 1, y: 0 }"
+      :duration="250 + (4 * 10)"
+      :delay="4 * 50"
+      :label="t('settings.chat.toolCalls.title')"
+      :description="t('settings.chat.toolCalls.description')"
+    />
+
     <div
       v-motion
       text="neutral-200/50 dark:neutral-600/20" pointer-events-none

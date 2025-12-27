@@ -4,6 +4,7 @@ import type { ChatAssistantMessage, ChatSlices, ChatSlicesText } from '../../../
 import { computed } from 'vue'
 
 import MarkdownRenderer from '../../markdown/MarkdownRenderer.vue'
+import ChatThinkBlock from './ChatThinkBlock.vue'
 import ChatToolCallBlock from './ChatToolCallBlock.vue'
 
 const props = withDefaults(defineProps<{
@@ -39,6 +40,7 @@ const containerClass = computed(() => props.variant === 'mobile' ? 'mr-0' : 'mr-
 const boxClasses = computed(() => [
   props.variant === 'mobile' ? 'px-2 py-2 text-sm bg-primary-50/90 dark:bg-primary-950/90' : 'px-3 py-3 bg-primary-50/80 dark:bg-primary-950/80',
 ])
+const hasThinkContent = computed(() => !!props.message.think?.trim())
 </script>
 
 <template>
@@ -51,6 +53,12 @@ const boxClasses = computed(() => [
       <div>
         <span text-sm text="black/60 dark:white/65" font-normal class="inline <sm:hidden">{{ label }}</span>
       </div>
+      <!-- Show think content first (collapsed by default) -->
+      <ChatThinkBlock
+        v-if="hasThinkContent"
+        :think-content="message.think!"
+        class="mb-2"
+      />
       <div v-if="resolvedSlices.length > 0" class="break-words" text="primary-700 dark:primary-100">
         <template v-for="(slice, sliceIndex) in resolvedSlices" :key="sliceIndex">
           <ChatToolCallBlock
